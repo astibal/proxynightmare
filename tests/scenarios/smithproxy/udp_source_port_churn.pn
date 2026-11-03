@@ -1,0 +1,39 @@
+preamble
+name "Smithproxy UDP source-port churn"
+description "Marked datagrams survive repeated client socket replacement"
+owner "smithproxy"
+timeout 30s
+begin using udp
+server at "netns:sxr-origin"
+client at "netns:sxr-client"
+server listen "198.18.20.2:19002"
+client connect "198.18.20.2:19002"
+
+server drain 32KiB stamp-every 1KiB
+client transmit 32KiB stamp-every 1KiB chunk 1200B delay 1ms
+client await-tx
+server await-rx
+
+server reconnect
+client reconnect
+server drain 32KiB stamp-every 1KiB
+client transmit 32KiB stamp-every 1KiB chunk 511B delay 1ms
+client await-tx
+server await-rx
+
+server reconnect
+client reconnect
+server drain 32KiB stamp-every 1KiB
+client transmit 32KiB stamp-every 1KiB chunk 1379B delay 1ms
+client await-tx
+server await-rx
+server close
+client close
+end
+outcome pass
+when server.rx.bytes == 32KiB
+and server.rx.integrity == valid
+describe "The final UDP generation arrived intact after two source-port changes."
+outcome fail "A UDP churn generation was lost, reordered, truncated, or corrupted."
+outcome timeout "UDP source-port churn stalled."
+end

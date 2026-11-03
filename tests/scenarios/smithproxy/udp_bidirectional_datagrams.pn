@@ -1,0 +1,30 @@
+preamble
+name "Smithproxy bidirectional UDP datagrams"
+description "Asymmetric marked datagram streams cross the generic UDP listener in both directions"
+owner "smithproxy"
+timeout 30s
+begin using udp
+server at "netns:sxr-origin"
+client at "netns:sxr-client"
+server listen "198.18.20.2:19001"
+client connect "198.18.20.2:19001"
+server drain 256KiB stamp-every 1KiB
+client transmit 256KiB stamp-every 1KiB chunk 1201B delay 1ms
+client await-tx
+server await-rx
+client drain 256KiB stamp-every 1KiB
+server transmit 256KiB stamp-every 1KiB chunk 509B delay 1ms
+server await-tx
+client await-rx
+server close
+client close
+end
+outcome pass
+when server.rx.bytes == 256KiB
+and server.rx.integrity == valid
+and client.rx.bytes == 256KiB
+and client.rx.integrity == valid
+describe "Smithproxy preserved UDP streams in both directions."
+outcome fail "Smithproxy lost, duplicated, reordered, or corrupted UDP payload."
+outcome timeout "Bidirectional UDP stopped making progress."
+end

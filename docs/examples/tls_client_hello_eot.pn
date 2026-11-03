@@ -1,0 +1,22 @@
+preamble
+name "TLS ClientHello followed by TCP FIN"
+description "Proxy must forward a complete ClientHello before propagating half-close"
+timeout 10s
+begin using tls
+server at local
+client at local
+server listen "127.0.0.1:49302"
+client connect "127.0.0.1:49302"
+client hello
+client write-eot
+server receive-eot
+server close
+client close
+end
+outcome pass
+when server.tls.client-hello == received
+and server.rx.eot == received
+describe "Server observed ClientHello followed by TCP EOF."
+outcome fail "ClientHello or the following TCP FIN was not propagated."
+outcome timeout "TLS ClientHello/FIN sequence stalled."
+end

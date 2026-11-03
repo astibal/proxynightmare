@@ -1,0 +1,37 @@
+preamble
+name "Smithproxy client half-close with delayed response"
+description "The origin responds after the client has sent FIN and remained open for reading"
+owner "smithproxy"
+timeout 20s
+begin using tcp
+server at "netns:sxr-origin"
+client at "netns:sxr-client"
+server listen "198.18.20.2:18081"
+client connect "198.18.20.2:18081"
+server drain 2MiB stamp-every 4KiB
+client drain 2MiB stamp-every 4KiB
+client transmit 2MiB stamp-every 4KiB chunk 257B
+client await-tx
+client half-close-write
+server await-rx
+server receive-eot
+server sleep 250ms
+server transmit 2MiB stamp-every 4KiB chunk 251B
+server await-tx
+server half-close-write
+client await-rx
+client receive-eot
+server close
+client close
+end
+outcome pass
+when server.rx.bytes == 2MiB
+and server.rx.integrity == valid
+and server.rx.eot == received
+and client.rx.bytes == 2MiB
+and client.rx.integrity == valid
+and client.rx.eot == received
+describe "A delayed response survived the client's write half-close."
+outcome fail "Smithproxy treated client FIN as a fatal full-duplex close."
+outcome timeout "Smithproxy failed to propagate FIN or drain the delayed response."
+end

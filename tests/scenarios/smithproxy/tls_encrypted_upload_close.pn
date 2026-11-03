@@ -1,0 +1,32 @@
+preamble
+name "Smithproxy encrypted TLS upload and close"
+description "A marked upload crosses the decrypt/re-encrypt MITM path before close_notify"
+owner "smithproxy"
+timeout 30s
+begin using tls
+server at "netns:sxr-origin"
+client at "netns:sxr-client"
+server listen "198.18.20.2:443"
+client connect "198.18.20.2:443"
+client handshake
+server drain 1MiB stamp-every 2KiB
+client transmit 1MiB stamp-every 2KiB chunk 333B delay 1ms
+client await-tx
+server await-rx
+client close-notify
+client write-eot
+server receive-eot
+server close
+client close
+end
+outcome pass
+when client.tls.handshake == complete
+and server.tls.handshake == complete
+and server.rx.bytes == 1MiB
+and server.rx.integrity == valid
+and server.tls.close-notify == received
+and server.rx.eot == received
+describe "Smithproxy decrypted, inspected and re-encrypted the complete marked upload."
+outcome fail "TLS handshake, AEAD transport, integrity, or clean shutdown failed."
+outcome timeout "Encrypted TLS upload or shutdown stalled."
+end

@@ -1,0 +1,38 @@
+preamble
+name "Smithproxy slow bidirectional backpressure"
+description "Asymmetric chunks and pacing keep both proxy directions queued"
+owner "smithproxy"
+timeout 60s
+begin using tcp
+server at "netns:sxr-origin"
+client at "netns:sxr-client"
+server listen "198.18.20.2:18083"
+client connect "198.18.20.2:18083"
+server set-sndbuf 1KiB
+server set-rcvbuf 1KiB
+client set-sndbuf 1KiB
+client set-rcvbuf 1KiB
+server drain 1MiB stamp-every 2KiB
+client drain 1MiB stamp-every 2KiB
+server transmit 1MiB stamp-every 2KiB chunk 79B delay 1ms
+client transmit 1MiB stamp-every 2KiB chunk 83B delay 1ms
+server await-tx
+client await-tx
+client half-close-write
+server await-rx
+server half-close-write
+client await-rx
+server receive-eot
+client receive-eot
+server close
+client close
+end
+outcome pass
+when server.rx.bytes == 1MiB
+and server.rx.integrity == valid
+and client.rx.bytes == 1MiB
+and client.rx.integrity == valid
+describe "Smithproxy drained both queued directions without corruption."
+outcome fail "Smithproxy corrupted or truncated traffic under sustained backpressure."
+outcome timeout "Smithproxy stopped making progress under sustained backpressure."
+end

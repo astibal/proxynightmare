@@ -1,0 +1,48 @@
+preamble
+name "QUIC multi-stream churn"
+description "Three encrypted QUIC streams use different fragmentation and clean FINs"
+timeout 20s
+begin using quic
+server at local
+client at local
+server listen "127.0.0.1:49311"
+client connect "127.0.0.1:49311"
+client handshake
+
+server drain 64KiB stamp-every 1KiB
+client transmit 64KiB stamp-every 1KiB chunk 119B
+client await-tx
+client half-close-write
+server await-rx
+server receive-eot
+client next-stream
+server next-stream
+
+server drain 64KiB stamp-every 1KiB
+client transmit 64KiB stamp-every 1KiB chunk 1200B
+client await-tx
+client half-close-write
+server await-rx
+server receive-eot
+client next-stream
+server next-stream
+
+server drain 64KiB stamp-every 1KiB
+client transmit 64KiB stamp-every 1KiB chunk 4093B
+client await-tx
+client half-close-write
+server await-rx
+server receive-eot
+server close
+client close
+end
+outcome pass
+when client.quic.handshake == complete
+and server.quic.handshake == complete
+and server.rx.bytes == 64KiB
+and server.rx.integrity == valid
+and server.rx.eot == received
+describe "Three real QUIC streams completed without loss or corruption."
+outcome fail "QUIC multi-stream churn failed."
+outcome timeout "QUIC stream churn stalled."
+end

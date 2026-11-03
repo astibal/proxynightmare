@@ -1,0 +1,41 @@
+preamble
+name "Smithproxy encrypted TLS full-duplex tiny-buffer torture"
+description "Two AEAD-protected marked streams cross the MITM path under backpressure"
+owner "smithproxy"
+timeout 60s
+begin using tls
+server at "netns:sxr-origin"
+client at "netns:sxr-client"
+server listen "198.18.20.2:443"
+client connect "198.18.20.2:443"
+server set-sndbuf 4KiB
+server set-rcvbuf 4KiB
+client set-sndbuf 4KiB
+client set-rcvbuf 4KiB
+client handshake
+server drain 1MiB stamp-every 2KiB
+client drain 1MiB stamp-every 2KiB
+server transmit 1MiB stamp-every 2KiB chunk 317B delay 1ms
+client transmit 1MiB stamp-every 2KiB chunk 333B delay 1ms
+server await-tx
+client await-tx
+server await-rx
+client await-rx
+client close-notify
+client write-eot
+server receive-eot
+server close
+client close
+end
+outcome pass
+when client.tls.handshake == complete
+and server.tls.handshake == complete
+and server.rx.bytes == 1MiB
+and server.rx.integrity == valid
+and client.rx.bytes == 1MiB
+and client.rx.integrity == valid
+and server.tls.close-notify == received
+describe "Smithproxy preserved both encrypted streams under TLS backpressure."
+outcome fail "Smithproxy corrupted, truncated, or stalled an encrypted direction."
+outcome timeout "Full-duplex encrypted TLS stopped making progress."
+end
